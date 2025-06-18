@@ -1,0 +1,9 @@
+level,message
+ERROR,Failed to connect to database
+WARNING,Memory usage is high
+INFO,System rebooted successfully
+ERROR,Failed login attempt
+INFO,User created successfully
+WARNING,Disk space running low
+ERROR,Service timeout occurred
+INFO,Backup completed

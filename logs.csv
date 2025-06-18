@@ -1,0 +1,3 @@
+timestamp,event,status
+2025-06-17 12:00:00,User login,success
+2025-06-17 12:05:00,File upload,failed
