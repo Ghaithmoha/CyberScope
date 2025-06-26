@@ -1,0 +1,56 @@
+# Multi-stage production Dockerfile
+FROM node:18-alpine AS frontend-build
+
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci --only=production
+
+COPY frontend/ ./
+RUN npm run build
+
+# Python backend build
+FROM python:3.11-slim AS backend-build
+
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Production image
+FROM python:3.11-slim AS production
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    nginx \
+    supervisor \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy Python dependencies
+COPY --from=backend-build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-build /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY . .
+COPY --from=frontend-build /app/frontend/build ./frontend/build
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/models /app/uploads
+
+# Copy configuration files
+COPY deployment/nginx.conf /etc/nginx/sites-available/default
+COPY deployment/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Set permissions
+RUN chmod +x deployment/entrypoint.sh
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose ports
+EXPOSE 80 8000 5000
+
+# Use supervisor to manage multiple processes
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
